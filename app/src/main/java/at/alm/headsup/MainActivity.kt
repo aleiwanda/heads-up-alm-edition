@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,15 +25,24 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import at.alm.headsup.response.DeepPlaylistResponse
 import at.alm.headsup.response.PlaylistTrackResponse
 import at.alm.headsup.response.ShallowPlaylistResponse
+import java.util.stream.Collectors
 import kotlin.time.DurationUnit
 import kotlin.time.toDuration
 
@@ -64,30 +74,13 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun App(modifier: Modifier = Modifier, viewModel: MainViewModel = viewModel()) {
         val currentPlaylist = viewModel.uiState.selectedPlaylist
-//        var color by remember { mutableStateOf(Green) }
         if (currentPlaylist == null || viewModel.uiState.timeLeft <= 0) {
             PlaylistOverviewScreen(modifier, viewModel)
         } else {
-//            Box(
-//                modifier = Modifier
-//                    .focusable()
-//                    .fillMaxHeight()
-//                    .background(color)
-//                    .onFocusChanged { color = if (it.isFocused) Blue else Green }
-//                    .onKeyEvent({ event ->
-//                        if (event.type == KeyEventType.KeyUp) {
-//                            if (event.key == Key.VolumeUp || event.key == Key.VolumeDown || event.key == Key.Back) {
-//                                viewModel.setCurrentPlaylist("a", null)
-//                            }
-//                        }
-//                        true
-//                    })
-//            ) {
             SinglePlaylistScreen(
                 currentPlaylist,
                 viewModel.uiState.timeLeft
             ) { viewModel.stop() }
-//            }
         }
     }
 
@@ -97,17 +90,43 @@ class MainActivity : ComponentActivity() {
         timeLeft: Int,
         goBack: () -> Unit
     ) {
-        val items: List<PlaylistTrackResponse> = currentPlaylist.items.items
-        Column(modifier = Modifier.padding(30.dp)) {
+        val items: List<PlaylistTrackResponse> by rememberSaveable { mutableStateOf(currentPlaylist.items.items.shuffled()) }
+        var itemIndex: Int by rememberSaveable { mutableIntStateOf(0) }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable(onClick = { itemIndex += 1 }),
+//                .focusable()
+//                .onKeyEvent { event ->
+//                    if (event.type == KeyEventType.KeyUp) {
+//                        if (event.key == Key.VolumeUp || event.key == Key.VolumeDown || event.key == Key.Back) {
+//                            itemIndex += 1
+//                            return@onKeyEvent true
+//                        }
+//                    }
+//                    false
+//                },
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Button(onClick = { goBack() }) {
                 Text(text = "Back")
             }
-            Text(text = "%d:%02d".format(timeLeft / 60, timeLeft % 60))
-            LazyColumn(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
-
-                items(items = items) {
-                    Text(text = it.item.name)
-                }
+            if (itemIndex < items.size) {
+                Text(
+                    fontSize = 30.sp,
+                    lineHeight = 40.sp,
+                    fontWeight = FontWeight.Bold,
+                    text = "%d:%02d".format(timeLeft / 60, timeLeft % 60)
+                )
+                Text(text = "$itemIndex / ${items.size}")
+                Text(fontSize = 40.sp, lineHeight = 50.sp, text = items[itemIndex].item.name)
+                Text(
+                    fontStyle = FontStyle.Italic,
+                    text = items[itemIndex].item.artists.stream().map { a -> a.name }
+                        .collect(Collectors.joining(",")) + " - " + items[itemIndex].item.album.name + " - " + items[itemIndex].item.album.releaseDate)
+            } else {
+                Text(fontSize = 40.sp, lineHeight = 50.sp, text = "Finished")
             }
         }
     }
