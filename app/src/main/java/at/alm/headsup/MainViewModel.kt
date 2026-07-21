@@ -34,4 +34,16 @@ class MainViewModel(
             _uiState.playlistsReloading = false
         }
     }
+
+    fun setCurrentPlaylist(id: String?, tokenResponse: TokenResponse?) {
+        if (id == null) {
+            _uiState.currentPlaylist = null
+            return
+        }
+        val playlist = repository.getPlaylist(id)
+        if (playlist == null && tokenResponse != null) {
+            repository.reloadPlaylist(id, tokenResponse)
+        }
+        _uiState.currentPlaylist = repository.getPlaylist(id)
+    }
 }

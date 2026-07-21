@@ -1,14 +1,14 @@
 package at.alm.headsup.response
 
-class PlaylistListResponse(
+class TrackListResponse(
     href: String?,
-    items: List<ShallowPlaylistResponse>,
+    items: List<PlaylistTrackResponse>,
     limit: Int,
     next: String?,
     offset: Int,
     previous: String?,
     total: Int
-) : GenericListResponse<ShallowPlaylistResponse>(
+) : GenericListResponse<PlaylistTrackResponse>(
     href,
     items,
     limit,

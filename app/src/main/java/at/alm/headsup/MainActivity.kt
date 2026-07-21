@@ -19,13 +19,16 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import at.alm.headsup.response.PlaylistResponse
+import at.alm.headsup.response.DeepPlaylistResponse
+import at.alm.headsup.response.PlaylistTrackResponse
+import at.alm.headsup.response.ShallowPlaylistResponse
 
 class MainActivity : ComponentActivity() {
     val TAG = this.javaClass.simpleName
@@ -53,12 +56,55 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun App(modifier: Modifier = Modifier) {
-        PlaylistScreen()
+    fun App(modifier: Modifier = Modifier, viewModel: MainViewModel = viewModel()) {
+        val currentPlaylist = viewModel.uiState.currentPlaylist
+//        var color by remember { mutableStateOf(Green) }
+        if (currentPlaylist == null) {
+            PlaylistOverviewScreen(modifier, viewModel)
+        } else {
+//            Box(
+//                modifier = Modifier
+//                    .focusable()
+//                    .fillMaxHeight()
+//                    .background(color)
+//                    .onFocusChanged { color = if (it.isFocused) Blue else Green }
+//                    .onKeyEvent({ event ->
+//                        if (event.type == KeyEventType.KeyUp) {
+//                            if (event.key == Key.VolumeUp || event.key == Key.VolumeDown || event.key == Key.Back) {
+//                                viewModel.setCurrentPlaylist("a", null)
+//                            }
+//                        }
+//                        true
+//                    })
+//            ) {
+            SinglePlaylistScreen(
+                currentPlaylist,
+                { viewModel.setCurrentPlaylist(null, null) })
+//            }
+        }
     }
 
     @Composable
-    fun PlaylistScreen(modifier: Modifier = Modifier, viewModel: MainViewModel = viewModel()) {
+    fun SinglePlaylistScreen(
+        currentPlaylist: DeepPlaylistResponse,
+        goBack: () -> Unit
+    ) {
+        val items: List<PlaylistTrackResponse> = currentPlaylist.items.items
+        Column(modifier = Modifier.padding(30.dp)) {
+            Button(onClick = { goBack() }) {
+                Text(text = "Back")
+            }
+            LazyColumn(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
+
+                items(items = items) {
+                    Text(text = it.item.name)
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun PlaylistOverviewScreen(modifier: Modifier = Modifier, viewModel: MainViewModel) {
         val activity = this
         Column(
             modifier = modifier.fillMaxSize(),
@@ -103,7 +149,12 @@ class MainActivity : ComponentActivity() {
             if (viewModel.uiState.playlistsReloading) {
                 LinearProgressIndicator()
             }
-            PlayListList(viewModel.uiState.playlists)
+            PlayListList(viewModel.uiState.playlists) { id ->
+                val tokenResponse = spotifyConnector.tokenResponseContent.getOrNull()
+                if (tokenResponse != null) {
+                    viewModel.setCurrentPlaylist(id, tokenResponse)
+                }
+            }
         }
     }
 
@@ -111,10 +162,12 @@ class MainActivity : ComponentActivity() {
      * Extra composable so the state gets updated if the list updates
      */
     @Composable
-    private fun PlayListList(playlists: List<PlaylistResponse>) {
+    private fun PlayListList(playlists: List<ShallowPlaylistResponse>, onClick: (String) -> Unit) {
         LazyColumn(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
             items(items = playlists) {
-                Text(text = it.name)
+                TextButton(onClick = { onClick(it.id) }) {
+                    Text(text = it.name)
+                }
             }
         }
     }
