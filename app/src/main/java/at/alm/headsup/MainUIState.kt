@@ -6,6 +6,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
 import at.alm.headsup.response.DeepPlaylistResponse
 import at.alm.headsup.response.ShallowPlaylistResponse
+import kotlin.time.Duration
+import kotlin.time.DurationUnit
+import kotlin.time.toDuration
 
 enum class LoginProcess { LOGGED_OUT, REQUESTED, INITIATED, LOGGED_IN }
 
@@ -13,7 +16,10 @@ interface MainUIState {
     val loginState: LoginProcess
     val playlists: List<ShallowPlaylistResponse>
     val playlistsReloading: Boolean
-    val currentPlaylist: DeepPlaylistResponse?
+    val selectedPlaylist: DeepPlaylistResponse?
+    var duration: Duration
+    var timeLeft: Int
+
 }
 
 class MutableMainUIState : MainUIState {
@@ -21,5 +27,7 @@ class MutableMainUIState : MainUIState {
     override var playlists: List<ShallowPlaylistResponse> =
         emptyList<ShallowPlaylistResponse>().toMutableStateList()
     override var playlistsReloading: Boolean by mutableStateOf(false)
-    override var currentPlaylist: DeepPlaylistResponse? by mutableStateOf(null)
+    override var selectedPlaylist: DeepPlaylistResponse? by mutableStateOf(null)
+    override var duration: Duration by mutableStateOf(60.toDuration(DurationUnit.SECONDS))
+    override var timeLeft: Int by mutableStateOf(0)
 }
