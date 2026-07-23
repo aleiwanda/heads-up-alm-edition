@@ -6,6 +6,14 @@ plugins {
 }
 
 android {
+    buildFeatures {
+        compose = true
+    }
+
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.1.1"
+    }
+
     namespace = "at.alm.headsup"
     compileSdk {
         version = release(37) {
@@ -50,6 +58,11 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.compose.material.icons.core)
+    implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.androidx.material3)
+    implementation(libs.androidx.compose.material3.window.size.class1)
+    implementation(libs.androidx.compose.material3.adaptive.navigation.suite)
 
     // Other
     implementation(libs.spotify.auth)
@@ -67,19 +80,4 @@ dependencies {
     // Debug
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
-
-    // Hilt
-//    implementation(libs.hilt.android)
-//    ksp(libs.hilt.android.compiler)
-
-    // Room
-//    ksp(libs.androidx.room.compiler)
-//    implementation(libs.androidx.room.runtime)
-//    annotationProcessor(libs.androidx.room.compiler)
-//    implementation("androidx.room:room-ktx:$room_version")
-//    implementation("androidx.room:room-rxjava2:$room_version")
-//    implementation("androidx.room:room-rxjava3:$room_version")
-//    implementation("androidx.room:room-guava:$room_version")
-//    testImplementation("androidx.room:room-testing:$room_version")
-//    implementation("androidx.room:room-paging:$room_version")
 }

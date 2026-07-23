@@ -32,4 +32,24 @@ class DeepPlaylistResponse(
     snapshotId,
     type,
     uri
-)
+) {
+    fun toShallowPlaylistResponse(): ShallowPlaylistResponse {
+        return ShallowPlaylistResponse(
+            collaborative,
+            description,
+            externalUrls,
+            followers,
+            href,
+            id,
+            images,
+            GenericItemResponse(items.href, items.total),
+            name,
+            owner,
+            primaryColor,
+            public,
+            snapshotId,
+            type,
+            uri,
+        )
+    }
+}

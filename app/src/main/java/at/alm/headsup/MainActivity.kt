@@ -17,8 +17,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -33,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -73,6 +77,7 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     fun App(modifier: Modifier = Modifier, viewModel: MainViewModel = viewModel()) {
+        viewModel.setContext(LocalContext.current)
         val currentPlaylist = viewModel.uiState.selectedPlaylist
         if (currentPlaylist == null || viewModel.uiState.timeLeft <= 0) {
             PlaylistOverviewScreen(modifier, viewModel)
@@ -136,7 +141,6 @@ class MainActivity : ComponentActivity() {
         val activity = this
         Column(
             modifier = modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.SpaceEvenly,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(
@@ -197,7 +201,20 @@ class MainActivity : ComponentActivity() {
                     steps = 8
                 )
             }
-            PlayListList(viewModel.uiState.playlists, viewModel)
+            PlayListList(
+                viewModel.uiState.localPlaylists,
+                viewModel.uiState.remotePlaylists,
+                viewModel.uiState,
+                { playlistId ->
+                    spotifyConnector.tokenResponseContent.getOrNull()
+                        ?.let { it1 -> viewModel.downloadPlaylist(playlistId, it1) }
+                },
+                { playlistId ->
+                    viewModel.setSelectedPlaylist(
+                        playlistId,
+                        spotifyConnector.tokenResponseContent.getOrNull()
+                    )
+                })
         }
     }
 
@@ -205,35 +222,74 @@ class MainActivity : ComponentActivity() {
      * Extra composable so the state gets updated if the list updates
      */
     @Composable
-    private fun PlayListList(playlists: List<ShallowPlaylistResponse>, viewModel: MainViewModel) {
+
+    private fun PlayListList(
+        localPlaylists: List<ShallowPlaylistResponse>,
+        remotePlaylists: List<ShallowPlaylistResponse>,
+        uiState: MainUIState,
+        downloadPlaylist: (String) -> Unit,
+        setSelectedPlaylist: (String) -> Unit
+    ) {
+        val playlists =
+            localPlaylists.fold(HashMap<String, Pair<ShallowPlaylistResponse?, ShallowPlaylistResponse?>>()) { map, e ->
+                map[e.id] = Pair(e, null); map
+            }
+        for (rp in remotePlaylists) {
+            val lp = playlists[rp.id]?.first
+            playlists[rp.id] = Pair(lp, rp)
+        }
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
                 .selectableGroup(),
             horizontalAlignment = Alignment.Start
         ) {
-            items(items = playlists) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .selectable(
-                            selected = (it.id == viewModel.uiState.selectedPlaylist?.id),
-                            onClick = {
-                                val tokenResponse =
-                                    spotifyConnector.tokenResponseContent.getOrNull()
-                                if (tokenResponse != null) {
-                                    viewModel.setSelectedPlaylist(it.id, tokenResponse)
+            items(items = playlists.values.toList()) {
+                val first = it.first
+                if (first == null) {
+                    val second = it.second
+                    if (second == null) {
+                        TODO()
+                    }
+                    Row(
+                        modifier = Modifier
+                            .padding(10.dp)
+                            .fillMaxWidth()
+                            .clickable(
+                                onClick = {
+                                    downloadPlaylist(second.id)
                                 }
-                            },
-                            role = Role.RadioButton
-                        ),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    RadioButton(
-                        selected = (it.id == viewModel.uiState.selectedPlaylist?.id),
-                        onClick = null // null recommended for accessibility with screen readers
-                    )
-                    Text(text = it.name)
+                            ),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+
+                        Icon(
+                            imageVector =
+                                Icons.Default.Download,
+                            contentDescription = "Download"
+                        )
+                        Text(text = second.name)
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier
+                            .padding(10.dp)
+                            .fillMaxWidth()
+                            .selectable(
+                                selected = (first.id == uiState.selectedPlaylist?.id),
+                                onClick = {
+                                    setSelectedPlaylist(first.id)
+                                },
+                                role = Role.RadioButton
+                            ),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = (first.id == uiState.selectedPlaylist?.id),
+                            onClick = null // null recommended for accessibility with screen readers
+                        )
+                        Text(text = first.name)
+                    }
                 }
             }
         }

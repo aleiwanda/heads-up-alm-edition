@@ -1,5 +1,6 @@
 package at.alm.headsup
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import at.alm.headsup.repository.MainRepository
@@ -14,11 +15,19 @@ import kotlin.time.Duration.Companion.seconds
 class MainViewModel(
     private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : ViewModel() {
-    val TAG = this.javaClass.simpleName
-    val repository = MainRepository()
+    private var context: Context? = null
+    val repository = MainRepository { context }
 
     private val _uiState = MutableMainUIState()
     val uiState: MainUIState = _uiState
+
+    fun setContext(context: Context) {
+        val initiaized = this.context != null;
+        this.context = context
+        if (!initiaized) {
+            _uiState.localPlaylists = repository.getLocalPlaylists()
+        }
+    }
 
     fun requestLogin() {
         _uiState.loginState = LoginProcess.REQUESTED
@@ -32,9 +41,15 @@ class MainViewModel(
         viewModelScope.launch(defaultDispatcher) {
             // Emit a new state indicating that login is in progress
             _uiState.playlistsReloading = true
-            repository.reloadPlaylists(tokenResponse)
-            _uiState.playlists = repository.getPlaylists()
+            _uiState.remotePlaylists = repository.getRemotePlaylists(tokenResponse)
             _uiState.playlistsReloading = false
+        }
+    }
+
+    fun downloadPlaylist(id: String, tokenResponse: TokenResponse) {
+        viewModelScope.launch(defaultDispatcher) {
+            repository.fetchAndStoreRemotePlaylist(id, tokenResponse)
+            _uiState.localPlaylists = repository.getLocalPlaylists().toList()
         }
     }
 
@@ -45,7 +60,7 @@ class MainViewModel(
         }
         val playlist = repository.getPlaylist(id)
         if (playlist == null && tokenResponse != null) {
-            repository.reloadPlaylist(id, tokenResponse)
+            repository.fetchAndStoreRemotePlaylist(id, tokenResponse)
         }
         _uiState.selectedPlaylist = repository.getPlaylist(id)
     }

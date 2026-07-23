@@ -14,7 +14,8 @@ enum class LoginProcess { LOGGED_OUT, REQUESTED, INITIATED, LOGGED_IN }
 
 interface MainUIState {
     val loginState: LoginProcess
-    val playlists: List<ShallowPlaylistResponse>
+    val localPlaylists: List<ShallowPlaylistResponse>
+    val remotePlaylists: List<ShallowPlaylistResponse>
     val playlistsReloading: Boolean
     val selectedPlaylist: DeepPlaylistResponse?
     var duration: Duration
@@ -24,7 +25,9 @@ interface MainUIState {
 
 class MutableMainUIState : MainUIState {
     override var loginState: LoginProcess by mutableStateOf(LoginProcess.LOGGED_OUT)
-    override var playlists: List<ShallowPlaylistResponse> =
+    override var localPlaylists: List<ShallowPlaylistResponse> =
+        emptyList<ShallowPlaylistResponse>().toMutableStateList()
+    override var remotePlaylists: List<ShallowPlaylistResponse> =
         emptyList<ShallowPlaylistResponse>().toMutableStateList()
     override var playlistsReloading: Boolean by mutableStateOf(false)
     override var selectedPlaylist: DeepPlaylistResponse? by mutableStateOf(null)

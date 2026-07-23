@@ -1,25 +1,26 @@
 package at.alm.headsup.repository
 
+import android.content.Context
 import at.alm.headsup.datasource.LocalDataSource
 import at.alm.headsup.datasource.SpotifyDataSource
 import at.alm.headsup.response.DeepPlaylistResponse
 import at.alm.headsup.response.ShallowPlaylistResponse
 import at.alm.headsup.response.TokenResponse
 
-class MainRepository {
-    val localDataSource: LocalDataSource = LocalDataSource()
+class MainRepository(context: () -> Context?) {
+    val localDataSource: LocalDataSource = LocalDataSource(context)
     val spotifyDataSource: SpotifyDataSource = SpotifyDataSource()
 
-    fun getPlaylists(): List<ShallowPlaylistResponse> {
+    fun getLocalPlaylists(): List<ShallowPlaylistResponse> {
         return localDataSource.getPlaylists()
     }
 
-    fun reloadPlaylists(tokenResponse: TokenResponse) {
+    fun getRemotePlaylists(tokenResponse: TokenResponse): List<ShallowPlaylistResponse> {
         val playlists = spotifyDataSource.getPlaylists(tokenResponse)
-        if (playlists.isSuccess) {
-            localDataSource.setPlaylists(playlists.getOrThrow())
+        return if (playlists.isSuccess) {
+            playlists.getOrDefault(emptyList())
         } else {
-            TODO()
+            emptyList() // TODO
         }
     }
 
@@ -27,10 +28,10 @@ class MainRepository {
         return localDataSource.getPlaylist(playlistId)
     }
 
-    fun reloadPlaylist(playlistId: String, tokenResponse: TokenResponse) {
+    fun fetchAndStoreRemotePlaylist(playlistId: String, tokenResponse: TokenResponse) {
         val playlist = spotifyDataSource.getPlaylist(playlistId, tokenResponse)
         if (playlist.isSuccess) {
-            localDataSource.setPlaylist(playlistId, playlist.getOrThrow())
+            localDataSource.storePlaylist(playlist.getOrThrow())
         } else {
             TODO()
         }
