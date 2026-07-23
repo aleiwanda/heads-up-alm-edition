@@ -1,9 +1,9 @@
 package at.alm.headsup
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.toMutableStateList
 import at.alm.headsup.response.DeepPlaylistResponse
 import at.alm.headsup.response.ShallowPlaylistResponse
 import kotlin.time.Duration
@@ -17,16 +17,13 @@ interface MainUIState {
     val selectedPlaylist: DeepPlaylistResponse?
     var duration: Duration
     var timeLeft: Int
-
 }
 
 class MutableMainUIState : MainUIState {
-    override var localPlaylists: List<ShallowPlaylistResponse> =
-        emptyList<ShallowPlaylistResponse>().toMutableStateList()
-    override var remotePlaylists: List<ShallowPlaylistResponse> =
-        emptyList<ShallowPlaylistResponse>().toMutableStateList()
+    override var localPlaylists: List<ShallowPlaylistResponse> by mutableStateOf(emptyList())
+    override var remotePlaylists: List<ShallowPlaylistResponse> by mutableStateOf(emptyList())
     override var playlistsReloading: Boolean by mutableStateOf(false)
     override var selectedPlaylist: DeepPlaylistResponse? by mutableStateOf(null)
     override var duration: Duration by mutableStateOf(60.toDuration(DurationUnit.SECONDS))
-    override var timeLeft: Int by mutableStateOf(0)
+    override var timeLeft: Int by mutableIntStateOf(0)
 }

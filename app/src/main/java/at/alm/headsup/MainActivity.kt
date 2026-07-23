@@ -194,12 +194,7 @@ fun PlaylistOverviewScreen(viewModel: MainViewModel) {
                 }, valueRange = (0.5f..5f), steps = 8
             )
         }
-        PlayListList(
-            viewModel.uiState.localPlaylists,
-            viewModel.uiState.remotePlaylists,
-            viewModel.uiState,
-            { viewModel.downloadPlaylist(it) },
-            { viewModel.setSelectedPlaylist(it) })
+        PlayListList(viewModel)
     }
 }
 
@@ -207,19 +202,14 @@ fun PlaylistOverviewScreen(viewModel: MainViewModel) {
  * Extra composable so the state gets updated if the list updates
  */
 @Composable
-
 private fun PlayListList(
-    localPlaylists: List<ShallowPlaylistResponse>,
-    remotePlaylists: List<ShallowPlaylistResponse>,
-    uiState: MainUIState,
-    downloadPlaylist: (String) -> Unit,
-    setSelectedPlaylist: (String) -> Unit
+    viewModel: MainViewModel,
 ) {
     val playlists =
-        localPlaylists.fold(HashMap<String, Pair<ShallowPlaylistResponse?, ShallowPlaylistResponse?>>()) { map, e ->
+        viewModel.uiState.localPlaylists.fold(HashMap<String, Pair<ShallowPlaylistResponse?, ShallowPlaylistResponse?>>()) { map, e ->
             map[e.id] = Pair(e, null); map
         }
-    for (rp in remotePlaylists) {
+    for (rp in viewModel.uiState.remotePlaylists) {
         val lp = playlists[rp.id]?.first
         playlists[rp.id] = Pair(lp, rp)
     }
@@ -228,7 +218,7 @@ private fun PlayListList(
             .fillMaxWidth()
             .selectableGroup(), horizontalAlignment = Alignment.Start
     ) {
-        items(items = playlists.values.toList()) {
+        items(items = playlists.values.sortedBy { e -> e.first?.name?:e.second?.name }) {
             val first = it.first
             if (first == null) {
                 val second = it.second
@@ -238,7 +228,7 @@ private fun PlayListList(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable(onClick = { downloadPlaylist(second.id) })
+                        .clickable(onClick = { viewModel.downloadPlaylist(second.id) })
                         .padding(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -252,15 +242,15 @@ private fun PlayListList(
                     modifier = Modifier
                         .fillMaxWidth()
                         .selectable(
-                            selected = (first.id == uiState.selectedPlaylist?.id), onClick = {
-                                setSelectedPlaylist(first.id)
+                            selected = (first.id == viewModel.uiState.selectedPlaylist?.id), onClick = {
+                                viewModel.setSelectedPlaylist(first.id)
                             }, role = Role.RadioButton
                         )
                         .padding(10.dp), verticalAlignment = Alignment.CenterVertically
 
                 ) {
                     RadioButton(
-                        selected = (first.id == uiState.selectedPlaylist?.id),
+                        selected = (first.id == viewModel.uiState.selectedPlaylist?.id),
                         onClick = null // null recommended for accessibility with screen readers
                     )
                     Text(text = "${first.name} - ${first.items?.total ?: 0}")

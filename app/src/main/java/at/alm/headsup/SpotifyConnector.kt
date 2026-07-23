@@ -3,6 +3,9 @@ package at.alm.headsup
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import at.alm.headsup.datasource.SpotifyDataSource
 import at.alm.headsup.response.TokenResponse
 import com.spotify.sdk.android.auth.AuthorizationClient
@@ -30,7 +33,7 @@ class SpotifyConnector(val activity: () -> MainActivity?) {
     private val CLIENT_SECRET = "6471d5a9d4d34f498bde15fa4827b7a8"
     private val objectMapper = jacksonObjectMapper()
     var inLoginProcess = false
-    var tokenResponseContent = Result.failure<TokenResponse>(NoTokenException())
+    var tokenResponseContent by mutableStateOf(Result.failure<TokenResponse>(NoTokenException()))
         private set
 
     fun openLoginWindow() {

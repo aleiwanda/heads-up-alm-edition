@@ -45,7 +45,7 @@ class MainViewModel(
         spotifyConnector.tokenResponseContent.getOrNull()?.let { tokenResponse ->
             viewModelScope.launch(defaultDispatcher) {
                 repository.fetchAndStoreRemotePlaylist(id, tokenResponse)
-                _uiState.localPlaylists = repository.getLocalPlaylists().toList()
+                _uiState.localPlaylists = repository.getLocalPlaylists()
             }
         }
     }
