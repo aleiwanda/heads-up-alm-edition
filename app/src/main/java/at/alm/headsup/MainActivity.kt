@@ -36,7 +36,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -53,7 +52,9 @@ import kotlin.time.toDuration
 class MainActivity : ComponentActivity() {
     val TAG = this.javaClass.simpleName
 
-    val spotifyConnector: SpotifyConnector = SpotifyConnector()
+    var spotifyLoginCallback: (resultCode: Int, data: Intent?) -> Unit = { a, b ->
+        val c = Log.e(TAG, "Spotify login callback not initialized")
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -68,39 +69,41 @@ class MainActivity : ComponentActivity() {
     @Deprecated("Deprecated but used because of Spotify API")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == spotifyConnector.requestCode) {
-            spotifyConnector.continueAuthorization(resultCode, data)
+        if (requestCode == SpotifyConnector.requestCode) {
+            spotifyLoginCallback(resultCode, data)
         } else {
             Log.e(TAG, "Got activity result for unknown activity, $requestCode, $resultCode, $data")
         }
     }
 
     @Composable
-    fun App(modifier: Modifier = Modifier, viewModel: MainViewModel = viewModel()) {
-        viewModel.setContext(LocalContext.current)
+    fun App(viewModel: MainViewModel = viewModel()) {
+        viewModel.setActivity(this)
         val currentPlaylist = viewModel.uiState.selectedPlaylist
         if (currentPlaylist == null || viewModel.uiState.timeLeft <= 0) {
-            PlaylistOverviewScreen(modifier, viewModel)
+            PlaylistOverviewScreen(viewModel)
         } else {
             SinglePlaylistScreen(
-                currentPlaylist,
-                viewModel.uiState.timeLeft
+                currentPlaylist, viewModel.uiState.timeLeft
             ) { viewModel.stop() }
         }
     }
+}
 
-    @Composable
-    fun SinglePlaylistScreen(
-        currentPlaylist: DeepPlaylistResponse,
-        timeLeft: Int,
-        goBack: () -> Unit
-    ) {
-        val items: List<PlaylistTrackResponse> by rememberSaveable { mutableStateOf(currentPlaylist.items.items.shuffled()) }
-        var itemIndex: Int by rememberSaveable { mutableIntStateOf(0) }
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .clickable(onClick = { itemIndex += 1 }),
+@Composable
+fun SinglePlaylistScreen(
+    currentPlaylist: DeepPlaylistResponse, timeLeft: Int, goBack: () -> Unit
+) {
+    val items: List<PlaylistTrackResponse> by rememberSaveable {
+        mutableStateOf(
+            currentPlaylist.items?.items?.shuffled() ?: emptyList()
+        )
+    }
+    var itemIndex: Int by rememberSaveable { mutableIntStateOf(0) }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable(onClick = { itemIndex += 1 }),
 //                .focusable()
 //                .onKeyEvent { event ->
 //                    if (event.type == KeyEventType.KeyUp) {
@@ -111,185 +114,156 @@ class MainActivity : ComponentActivity() {
 //                    }
 //                    false
 //                },
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Button(onClick = { goBack() }) {
-                Text(text = "Back")
-            }
-            if (itemIndex < items.size) {
-                Text(
-                    fontSize = 30.sp,
-                    lineHeight = 40.sp,
-                    fontWeight = FontWeight.Bold,
-                    text = "%d:%02d".format(timeLeft / 60, timeLeft % 60)
-                )
-                Text(text = "$itemIndex / ${items.size}")
-                Text(fontSize = 40.sp, lineHeight = 50.sp, text = items[itemIndex].item.name)
-                Text(
-                    fontStyle = FontStyle.Italic,
-                    text = items[itemIndex].item.artists.stream().map { a -> a.name }
-                        .collect(Collectors.joining(",")) + " - " + items[itemIndex].item.album.name + " - " + items[itemIndex].item.album.releaseDate)
-            } else {
-                Text(fontSize = 40.sp, lineHeight = 50.sp, text = "Finished")
-            }
-        }
-    }
-
-    @Composable
-    fun PlaylistOverviewScreen(modifier: Modifier = Modifier, viewModel: MainViewModel) {
-        val activity = this
-        Column(
-            modifier = modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Row(
-                modifier = modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Button(
-                    modifier = Modifier.padding(vertical = 24.dp),
-                    onClick = {
-                        viewModel.requestLogin()
-                    }
-                ) {
-                    when (viewModel.uiState.loginState) {
-                        LoginProcess.LOGGED_OUT -> Text("Login")
-                        LoginProcess.REQUESTED -> {
-                            Text("Login")
-                            spotifyConnector.openLoginWindow(activity)
-                            viewModel.markLoginAsInitiated()
-                        }
-
-                        LoginProcess.INITIATED -> CircularProgressIndicator(color = Color.Black)
-                        LoginProcess.LOGGED_IN -> Text("Logged in")
-                    }
-                }
-                Button(
-                    modifier = Modifier.padding(vertical = 24.dp),
-                    onClick = {
-                        val tokenResponse = spotifyConnector.tokenResponseContent.getOrNull()
-                        if (tokenResponse != null) {
-                            viewModel.reloadPlaylists(tokenResponse)
-                        }
-                    }
-                ) {
-                    Text("Load Playlists")
-                }
-                Button(onClick = { viewModel.start() }) {
-                    Text("Start")
-                }
-            }
-            if (viewModel.uiState.playlistsReloading) {
-                LinearProgressIndicator()
-            }
-            Row(
-                modifier = Modifier.padding(20.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                val duration = viewModel.uiState.duration.inWholeSeconds
-                Text(text = "%d:%02d".format(duration / 60, duration % 60))
-                Slider(
-                    value = duration / 60f,
-                    onValueChange = {
-                        viewModel.updateDuration(
-                            (it * 60).toInt().toDuration(DurationUnit.SECONDS)
-                        )
-                    },
-                    valueRange = (0.5f..5f),
-                    steps = 8
-                )
-            }
-            PlayListList(
-                viewModel.uiState.localPlaylists,
-                viewModel.uiState.remotePlaylists,
-                viewModel.uiState,
-                { playlistId ->
-                    spotifyConnector.tokenResponseContent.getOrNull()
-                        ?.let { it1 -> viewModel.downloadPlaylist(playlistId, it1) }
-                },
-                { playlistId ->
-                    viewModel.setSelectedPlaylist(
-                        playlistId,
-                        spotifyConnector.tokenResponseContent.getOrNull()
-                    )
-                })
-        }
-    }
-
-    /**
-     * Extra composable so the state gets updated if the list updates
-     */
-    @Composable
-
-    private fun PlayListList(
-        localPlaylists: List<ShallowPlaylistResponse>,
-        remotePlaylists: List<ShallowPlaylistResponse>,
-        uiState: MainUIState,
-        downloadPlaylist: (String) -> Unit,
-        setSelectedPlaylist: (String) -> Unit
+        verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        val playlists =
-            localPlaylists.fold(HashMap<String, Pair<ShallowPlaylistResponse?, ShallowPlaylistResponse?>>()) { map, e ->
-                map[e.id] = Pair(e, null); map
-            }
-        for (rp in remotePlaylists) {
-            val lp = playlists[rp.id]?.first
-            playlists[rp.id] = Pair(lp, rp)
+        Button(onClick = { goBack() }) {
+            Text(text = "Back")
         }
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .selectableGroup(),
-            horizontalAlignment = Alignment.Start
-        ) {
-            items(items = playlists.values.toList()) {
-                val first = it.first
-                if (first == null) {
-                    val second = it.second
-                    if (second == null) {
-                        TODO()
-                    }
-                    Row(
-                        modifier = Modifier
-                            .padding(10.dp)
-                            .fillMaxWidth()
-                            .clickable(
-                                onClick = {
-                                    downloadPlaylist(second.id)
-                                }
-                            ),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+        if (itemIndex < items.size) {
+            Text(
+                fontSize = 30.sp,
+                lineHeight = 40.sp,
+                fontWeight = FontWeight.Bold,
+                text = "%d:%02d".format(timeLeft / 60, timeLeft % 60)
+            )
+            Text(text = "$itemIndex / ${items.size}")
+            Text(fontSize = 40.sp, lineHeight = 50.sp, text = items[itemIndex].item.name)
+            Text(
+                fontStyle = FontStyle.Italic,
+                text = items[itemIndex].item.artists.stream().map { a -> a.name }
+                    .collect(Collectors.joining(",")) + " - " + items[itemIndex].item.album.name + " - " + items[itemIndex].item.album.releaseDate)
+        } else {
+            Text(fontSize = 40.sp, lineHeight = 50.sp, text = "Finished")
+        }
+    }
+}
 
-                        Icon(
-                            imageVector =
-                                Icons.Default.Download,
-                            contentDescription = "Download"
-                        )
-                        Text(text = second.name)
+@Composable
+fun PlaylistOverviewScreen(viewModel: MainViewModel) {
+    Column(
+        modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Button(
+                enabled = viewModel.spotifyConnector.getLoginState() != LoginState.LOGGING_IN,
+                modifier = Modifier.padding(vertical = 24.dp),
+                onClick = {
+                    when (viewModel.spotifyConnector.getLoginState()) {
+                        LoginState.LOGGED_OUT -> viewModel.spotifyConnector.openLoginWindow()
+                        LoginState.LOGGING_IN -> {}
+                        LoginState.LOGGED_IN -> viewModel.spotifyConnector.logout()
                     }
-                } else {
-                    Row(
-                        modifier = Modifier
-                            .padding(10.dp)
-                            .fillMaxWidth()
-                            .selectable(
-                                selected = (first.id == uiState.selectedPlaylist?.id),
-                                onClick = {
-                                    setSelectedPlaylist(first.id)
-                                },
-                                role = Role.RadioButton
-                            ),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = (first.id == uiState.selectedPlaylist?.id),
-                            onClick = null // null recommended for accessibility with screen readers
+                }) {
+                when (viewModel.spotifyConnector.getLoginState()) {
+                    LoginState.LOGGED_OUT -> Text("Logged out - Login")
+                    LoginState.LOGGING_IN -> CircularProgressIndicator(color = Color.Black)
+                    LoginState.LOGGED_IN -> Text("Logged in - Log out")
+                }
+            }
+            Button(
+                enabled = viewModel.spotifyConnector.getLoginState() == LoginState.LOGGED_IN,
+                modifier = Modifier.padding(vertical = 24.dp),
+                onClick = {
+                    viewModel.reloadPlaylists()
+                }) {
+                Text("Load Playlists")
+            }
+            Button(
+                enabled = viewModel.uiState.selectedPlaylist != null,
+                onClick = { viewModel.start() }) {
+                Text("Start")
+            }
+        }
+        if (viewModel.uiState.playlistsReloading) {
+            LinearProgressIndicator()
+        }
+        Row(
+            modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically
+        ) {
+            val duration = viewModel.uiState.duration.inWholeSeconds
+            Text(text = "%d:%02d".format(duration / 60, duration % 60))
+            Slider(
+                value = duration / 60f, onValueChange = {
+                    viewModel.updateDuration(
+                        (it * 60).toInt().toDuration(DurationUnit.SECONDS)
+                    )
+                }, valueRange = (0.5f..5f), steps = 8
+            )
+        }
+        PlayListList(
+            viewModel.uiState.localPlaylists,
+            viewModel.uiState.remotePlaylists,
+            viewModel.uiState,
+            { viewModel.downloadPlaylist(it) },
+            { viewModel.setSelectedPlaylist(it) })
+    }
+}
+
+/**
+ * Extra composable so the state gets updated if the list updates
+ */
+@Composable
+
+private fun PlayListList(
+    localPlaylists: List<ShallowPlaylistResponse>,
+    remotePlaylists: List<ShallowPlaylistResponse>,
+    uiState: MainUIState,
+    downloadPlaylist: (String) -> Unit,
+    setSelectedPlaylist: (String) -> Unit
+) {
+    val playlists =
+        localPlaylists.fold(HashMap<String, Pair<ShallowPlaylistResponse?, ShallowPlaylistResponse?>>()) { map, e ->
+            map[e.id] = Pair(e, null); map
+        }
+    for (rp in remotePlaylists) {
+        val lp = playlists[rp.id]?.first
+        playlists[rp.id] = Pair(lp, rp)
+    }
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxWidth()
+            .selectableGroup(), horizontalAlignment = Alignment.Start
+    ) {
+        items(items = playlists.values.toList()) {
+            val first = it.first
+            if (first == null) {
+                val second = it.second
+                if (second == null) {
+                    TODO()
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = { downloadPlaylist(second.id) })
+                        .padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Download, contentDescription = "Download"
+                    )
+                    Text(text = "${second.name} - ${second.items?.total ?: 0}")
+                }
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .selectable(
+                            selected = (first.id == uiState.selectedPlaylist?.id), onClick = {
+                                setSelectedPlaylist(first.id)
+                            }, role = Role.RadioButton
                         )
-                        Text(text = first.name)
-                    }
+                        .padding(10.dp), verticalAlignment = Alignment.CenterVertically
+
+                ) {
+                    RadioButton(
+                        selected = (first.id == uiState.selectedPlaylist?.id),
+                        onClick = null // null recommended for accessibility with screen readers
+                    )
+                    Text(text = "${first.name} - ${first.items?.total ?: 0}")
                 }
             }
         }

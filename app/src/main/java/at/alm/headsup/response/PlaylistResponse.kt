@@ -10,7 +10,7 @@ abstract class PlaylistResponse<T>(
     val href: String,
     val id: String,
     val images: List<ImageResponse>,
-    val items: T,
+    val items: T?,
     val name: String,
     val owner: UserResponse,
     @field:JsonProperty("primary_color") val primaryColor: String?,

@@ -23,7 +23,7 @@ android {
 
     defaultConfig {
         applicationId = "at.alm.headsup"
-        minSdk = 29
+        minSdk = 33
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"

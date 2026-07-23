@@ -1,10 +1,8 @@
 package at.alm.headsup
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import at.alm.headsup.repository.MainRepository
-import at.alm.headsup.response.TokenResponse
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -15,50 +13,50 @@ import kotlin.time.Duration.Companion.seconds
 class MainViewModel(
     private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : ViewModel() {
-    private var context: Context? = null
-    val repository = MainRepository { context }
+    private var activity: MainActivity? = null
+    val repository = MainRepository { activity }
+    val spotifyConnector: SpotifyConnector = SpotifyConnector { activity }
+
 
     private val _uiState = MutableMainUIState()
     val uiState: MainUIState = _uiState
 
-    fun setContext(context: Context) {
-        val initiaized = this.context != null;
-        this.context = context
-        if (!initiaized) {
+    fun setActivity(activity: MainActivity) {
+        val initialized = this.activity != null
+        this.activity = activity
+        if (!initialized) {
             _uiState.localPlaylists = repository.getLocalPlaylists()
+            spotifyConnector.loadTokenFromDisk()
         }
     }
 
-    fun requestLogin() {
-        _uiState.loginState = LoginProcess.REQUESTED
-    }
-
-    fun markLoginAsInitiated() {
-        _uiState.loginState = LoginProcess.INITIATED
-    }
-
-    fun reloadPlaylists(tokenResponse: TokenResponse) {
-        viewModelScope.launch(defaultDispatcher) {
-            // Emit a new state indicating that login is in progress
-            _uiState.playlistsReloading = true
-            _uiState.remotePlaylists = repository.getRemotePlaylists(tokenResponse)
-            _uiState.playlistsReloading = false
+    fun reloadPlaylists() {
+        spotifyConnector.tokenResponseContent.getOrNull()?.let { tokenResponse ->
+            viewModelScope.launch(defaultDispatcher) {
+                // Emit a new state indicating that login is in progress
+                _uiState.playlistsReloading = true
+                _uiState.remotePlaylists = repository.getRemotePlaylists(tokenResponse)
+                _uiState.playlistsReloading = false
+            }
         }
     }
 
-    fun downloadPlaylist(id: String, tokenResponse: TokenResponse) {
-        viewModelScope.launch(defaultDispatcher) {
-            repository.fetchAndStoreRemotePlaylist(id, tokenResponse)
-            _uiState.localPlaylists = repository.getLocalPlaylists().toList()
+    fun downloadPlaylist(id: String) {
+        spotifyConnector.tokenResponseContent.getOrNull()?.let { tokenResponse ->
+            viewModelScope.launch(defaultDispatcher) {
+                repository.fetchAndStoreRemotePlaylist(id, tokenResponse)
+                _uiState.localPlaylists = repository.getLocalPlaylists().toList()
+            }
         }
     }
 
-    fun setSelectedPlaylist(id: String?, tokenResponse: TokenResponse?) {
+    fun setSelectedPlaylist(id: String?) {
         if (id == null) {
             _uiState.selectedPlaylist = null
             return
         }
         val playlist = repository.getPlaylist(id)
+        val tokenResponse = spotifyConnector.tokenResponseContent.getOrNull()
         if (playlist == null && tokenResponse != null) {
             repository.fetchAndStoreRemotePlaylist(id, tokenResponse)
         }

@@ -10,10 +10,7 @@ import kotlin.time.Duration
 import kotlin.time.DurationUnit
 import kotlin.time.toDuration
 
-enum class LoginProcess { LOGGED_OUT, REQUESTED, INITIATED, LOGGED_IN }
-
 interface MainUIState {
-    val loginState: LoginProcess
     val localPlaylists: List<ShallowPlaylistResponse>
     val remotePlaylists: List<ShallowPlaylistResponse>
     val playlistsReloading: Boolean
@@ -24,7 +21,6 @@ interface MainUIState {
 }
 
 class MutableMainUIState : MainUIState {
-    override var loginState: LoginProcess by mutableStateOf(LoginProcess.LOGGED_OUT)
     override var localPlaylists: List<ShallowPlaylistResponse> =
         emptyList<ShallowPlaylistResponse>().toMutableStateList()
     override var remotePlaylists: List<ShallowPlaylistResponse> =
